@@ -5,6 +5,7 @@
 .build/
 .swiftpm/
 DerivedData/
+.superpowers/
 
 dist/
 

@@ -1,46 +1,57 @@
-# AppIconExporter
+<div align="center">
+  <img src="Assets/app-icon-compact.png" alt="App Icon Exporter icon" width="120" height="120">
 
-AppIconExporter is a macOS SwiftUI utility for extracting icons from `.app` bundles and exporting them as PNG files.
+  # App Icon Exporter
 
-It supports both single-app export and batch directory export, with a custom macOS-style interface and DMG packaging script.
+  Extract icons from macOS `.app` bundles and export them as clean PNG assets.
+
+  English · [简体中文](README.zh-CN.md) · [Features](#features) · [Quick Start](#quick-start) · [Signing](#developer-id-signing)
+</div>
+
+## Overview
+
+App Icon Exporter is a macOS SwiftUI utility for browsing application bundles, previewing their icons, and exporting those icons as reusable PNG files.
+
+It supports both single-app export and batch directory export, with a custom desktop interface and a release packaging script for generating a signed `.app` bundle and `.dmg`.
 
 ## Features
 
-- Batch scan a directory for `.app` bundles.
-- Export all discovered app icons to PNG in one pass.
-- Export a single selected or dropped `.app` icon.
+- Export the icon from a single selected or dropped `.app` bundle.
+- Batch scan a directory for `.app` bundles and export all discovered icons in one pass.
 - Preview app icons before export.
 - Choose and persist a default export directory.
-- Open the export directory from the app.
-- Handle duplicate output filenames by either adding numeric suffixes or skipping duplicates.
-- Optional recursive scanning for nested directories.
-- Custom traffic-light window controls and frameless rounded window UI.
+- Open the export directory directly from the app.
+- Handle duplicate filenames by adding numeric suffixes or skipping duplicates.
+- Optionally scan nested directories recursively.
+- Ship with a custom macOS-style frameless window UI.
 
-## Requirements
+## Quick Start
+
+### Requirements
 
 - macOS 14 or later
-- Xcode with Swift 6 toolchain
+- Xcode with a Swift 6 toolchain
 - Swift Package Manager
 
-## Build
+### Build
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build
 ```
 
-## Test
-
-```bash
-DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
-```
-
-## Run
+### Run
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift run AppIconExporterApp
 ```
 
-## Package
+### Test
+
+```bash
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
+```
+
+## Build, Run, and Package
 
 Build a release `.app` bundle and `.dmg`:
 
@@ -50,9 +61,23 @@ Build a release `.app` bundle and `.dmg`:
 
 Artifacts are written to `dist/`.
 
-The packaging script prefers a local `Developer ID Application` identity when one is available in Keychain Access. If no Apple-issued identity is available, it falls back to a project-local self-signed code signing identity for local testing.
+## Packaging
 
-If you need to bootstrap the identity manually:
+The packaging script assembles:
+
+- a release app bundle at `dist/应用图标导出器.app`
+- a compressed disk image at `dist/应用图标导出器.dmg`
+
+It also generates the `.icns` icon asset from the source PNG in `Assets/`.
+
+## Developer ID Signing
+
+`./scripts/build-dmg.sh` follows this signing order:
+
+1. Use a local `Developer ID Application` identity from Keychain Access when one is available.
+2. Fall back to a project-local self-signed identity for local testing.
+
+If you need to bootstrap the local test identity manually:
 
 ```bash
 ./scripts/ensure-local-signing.sh
@@ -64,25 +89,24 @@ To force ad-hoc signing for one build:
 SIGN_IDENTITY=- ./scripts/build-dmg.sh
 ```
 
-For distribution, pass a Developer ID identity:
+To explicitly select a signing identity:
 
 ```bash
 SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/build-dmg.sh
 ```
 
-If you already have only one valid `Developer ID Application` identity in your keychain, `./scripts/build-dmg.sh` will pick it automatically.
+If your keychain contains exactly one valid `Developer ID Application` identity, the packaging script will pick it automatically.
+
+For external distribution, `Developer ID` signing is not the final step. You will typically also need notarization before Gatekeeper will accept the build on another Mac.
 
 ## Project Layout
 
-- `Package.swift`: Swift package definition.
-- `Sources/AppIconExporter`: app models, services, view models, and SwiftUI views.
-- `Sources/AppIconExporterApp`: macOS app entry point and window configuration.
-- `Tests/AppIconExporterTests`: unit tests.
-- `Assets`: source images for app icon generation.
-- `scripts/build-dmg.sh`: release packaging script.
-- `mockups`: UI mockups used during design.
-- `docs`: planning notes.
-
-## Notes
-
-The generated `.app` and `.dmg` are intentionally ignored by Git. Rebuild them locally with `./scripts/build-dmg.sh` when needed.
+- `Package.swift` — Swift package definition.
+- `Sources/AppIconExporter` — models, services, view models, and SwiftUI views.
+- `Sources/AppIconExporterApp` — macOS app entry point and window configuration.
+- `Tests/AppIconExporterTests` — unit tests.
+- `Assets` — source artwork for app icon generation.
+- `scripts/build-dmg.sh` — release packaging script.
+- `scripts/ensure-local-signing.sh` — local fallback signing bootstrap script.
+- `docs` — planning and design notes.
+- `mockups` — UI mockups used during design.
