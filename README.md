@@ -50,11 +50,27 @@ Build a release `.app` bundle and `.dmg`:
 
 Artifacts are written to `dist/`.
 
-The packaging script uses an ad-hoc signature by default for local testing. For distribution, pass a Developer ID identity:
+The packaging script prefers a local `Developer ID Application` identity when one is available in Keychain Access. If no Apple-issued identity is available, it falls back to a project-local self-signed code signing identity for local testing.
+
+If you need to bootstrap the identity manually:
+
+```bash
+./scripts/ensure-local-signing.sh
+```
+
+To force ad-hoc signing for one build:
+
+```bash
+SIGN_IDENTITY=- ./scripts/build-dmg.sh
+```
+
+For distribution, pass a Developer ID identity:
 
 ```bash
 SIGN_IDENTITY="Developer ID Application: Your Name (TEAMID)" ./scripts/build-dmg.sh
 ```
+
+If you already have only one valid `Developer ID Application` identity in your keychain, `./scripts/build-dmg.sh` will pick it automatically.
 
 ## Project Layout
 

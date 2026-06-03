@@ -33,9 +33,12 @@ EXECUTABLE_NAME="AppIconExporterApp"
 BUNDLE_IDENTIFIER="com.shuai.app-icon-exporter.app"
 MINIMUM_SYSTEM_VERSION="14.0"
 BUNDLE_VERSION="${BUNDLE_VERSION:-$(date +%Y%m%d%H%M)}"
-SIGN_IDENTITY="${SIGN_IDENTITY:--}"
+SIGN_IDENTITY="${SIGN_IDENTITY:-}"
+SIGN_KEYCHAIN_PATH="${SIGN_KEYCHAIN_PATH:-}"
+SIGN_IDENTITY_LABEL="${SIGN_IDENTITY_LABEL:-}"
 ICON_SOURCE_PATH="$PROJECT_ROOT/Assets/app-icon-compact.png"
 ICON_FILE_NAME="AppIcon.icns"
+LOCAL_SIGNING_SCRIPT="$PROJECT_ROOT/scripts/ensure-local-signing.sh"
 
 BUILD_DIR="$PROJECT_ROOT/.build"
 RELEASE_DIR="$BUILD_DIR/release"
@@ -66,6 +69,39 @@ require_command hdiutil
 require_command codesign
 require_command iconutil
 require_command sips
+
+resolve_developer_id_identity() {
+  local identity_line
+
+  identity_line="$(
+    security find-identity -v -p codesigning 2>/dev/null |
+      awk '/Developer ID Application:/ { print; exit }'
+  )"
+
+  [[ -n "$identity_line" ]] || return 1
+
+  SIGN_IDENTITY="$(awk '{ print $2 }' <<<"$identity_line")"
+  SIGN_IDENTITY_LABEL="$(sed -E 's/^[[:space:]]*[0-9]+\)[[:space:]]+[0-9A-F]+[[:space:]]+"(.*)"$/\1/' <<<"$identity_line")"
+}
+
+resolve_signing_identity() {
+  if [[ -n "$SIGN_IDENTITY" ]]; then
+    return 0
+  fi
+
+  if resolve_developer_id_identity; then
+    return 0
+  fi
+
+  if [[ ! -x "$LOCAL_SIGNING_SCRIPT" ]]; then
+    echo "Missing local signing bootstrap script: $LOCAL_SIGNING_SCRIPT" >&2
+    exit 1
+  fi
+
+  local signing_env
+  signing_env="$("$LOCAL_SIGNING_SCRIPT" --print-env)"
+  eval "$signing_env"
+}
 
 mkdir -p "$ARTIFACTS_DIR"
 trap 'rm -rf "$STAGING_DIR" "$ICONSET_PATH" "$ICNS_BUILD_PATH"' EXIT
@@ -192,8 +228,19 @@ cat > "$APP_BUNDLE_PATH/Contents/Resources/zh-Hans.lproj/InfoPlist.strings" <<EO
 "CFBundleName" = "$APP_BUNDLE_NAME";
 EOF
 
-echo "为应用签名: $SIGN_IDENTITY"
-codesign --force --deep --sign "$SIGN_IDENTITY" "$APP_BUNDLE_PATH"
+resolve_signing_identity
+
+if [[ -n "$SIGN_IDENTITY_LABEL" ]]; then
+  echo "为应用签名: $SIGN_IDENTITY_LABEL ($SIGN_IDENTITY)"
+else
+  echo "为应用签名: $SIGN_IDENTITY"
+fi
+
+codesign_args=(--force --deep --sign "$SIGN_IDENTITY")
+if [[ -n "$SIGN_KEYCHAIN_PATH" ]]; then
+  codesign_args+=(--keychain "$SIGN_KEYCHAIN_PATH")
+fi
+codesign "${codesign_args[@]}" "$APP_BUNDLE_PATH"
 
 if [[ -x "$LSREGISTER_PATH" ]]; then
   echo "刷新 LaunchServices 注册..."
@@ -220,4 +267,10 @@ echo "DMG: $DMG_PATH"
 if [[ "$SIGN_IDENTITY" == "-" ]]; then
   echo "说明：当前使用的是 ad-hoc 签名，其他机器上的 Gatekeeper 很可能会拒绝该构建。"
   echo "如果要分发，请使用 SIGN_IDENTITY='Developer ID Application: ...' 重新打包。"
+elif [[ "$SIGN_IDENTITY_LABEL" == Developer\ ID\ Application:* ]]; then
+  echo "说明：当前使用真实 Developer ID Application 证书签名。"
+  echo "如需完整对外分发，下一步通常还需要 notarization。"
+else
+  echo "说明：当前默认使用项目本地固定签名身份；若要改回 ad-hoc，可显式传入 SIGN_IDENTITY=-。"
+  echo "如果要对外分发，请改用 Apple 签发的 Developer ID 证书重新打包。"
 fi
